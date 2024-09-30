@@ -22,16 +22,19 @@ jobs:
         go-version: '1.23.1'
 
     - name: Build
-      run: go build -v -o kasm-stress-test ./...
+      run: go build -v -o myapp ./...
 
     - name: Package
       run: |
         mkdir -p package
-        cp kasm-stress-test package/
+        cp myapp package/
+        cp README.md package/ || true
 
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
@@ -40,8 +43,10 @@ jobs:
 
     - name: Upload Release Asset
       uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./package/kasm-stress-test
+        asset_path: ./package/myapp
         asset_name: kasm-stress-test
         asset_content_type: application/octet-stream
