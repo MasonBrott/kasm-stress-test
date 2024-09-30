@@ -91,7 +91,6 @@ func (c *Client) DestroyKasm(kasmID, userID string) error {
 
 	// If the response is empty, it means the Kasm was destroyed successfully
 	if len(respBody) == 0 || string(respBody) == "{}" {
-		utils.Info("Kasm %s destroyed successfully", kasmID)
 		return nil
 	}
 
@@ -118,7 +117,6 @@ func (c *Client) WaitForKasmReady(kasmID, image_id string, timeout time.Duration
 		}
 
 		if status.Kasm.OperationalStatus == "running" {
-			utils.Info("Kasm %s is now running", kasmID)
 			return nil
 		}
 

@@ -83,7 +83,6 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 	kasm, err := r.client.RequestKasm(userID, r.config.DefaultImageID)
 	if err != nil {
 		utils.Error("Failed to request Kasm for user %s: %v", r.username, err)
-		result.ExecutionError = fmt.Sprintf("Failed to request Kasm: %v", err)
 		return result
 	}
 
@@ -94,12 +93,10 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 	err = r.client.WaitForKasmReady(kasm.KasmID, userID, 5*time.Minute)
 	if err != nil {
 		utils.Error("Failed waiting for Kasm %s to be ready: %v", kasm.KasmID, err)
-		result.ExecutionError = fmt.Sprintf("Failed waiting for Kasm to be ready: %v", err)
 		return result
 	}
 
 	result.StartTime = time.Since(startTime)
-	utils.Info("Kasm %s started in %v", kasm.KasmID, result.StartTime)
 
 	// Step 3: Execute command
 	utils.Info("Step 3: Executing command on Kasm %s", kasm.KasmID)

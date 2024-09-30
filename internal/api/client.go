@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"kasm-stress-test/internal/config"
-	"kasm-stress-test/internal/utils"
 )
 
 // Client represents the API client for interacting with the Kasm API
@@ -37,14 +36,11 @@ func (c *Client) post(endpoint string, body interface{}) ([]byte, error) {
 	endpoint = strings.TrimPrefix(endpoint, "/")
 
 	url := apiBase + endpoint
-	utils.Info("Making POST request to: %s", url)
 
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request body: %w", err)
 	}
-
-	utils.Info("Request body: %s", string(jsonBody))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
