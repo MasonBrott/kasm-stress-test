@@ -22,7 +22,26 @@ jobs:
         go-version: '1.23.1'
 
     - name: Build
-      run: go build -v ./...
+      run: go build -v -o kasm-stress-test ./...
 
-    - name: Test
-      run: go test -v ./...
+    - name: Package
+      run: |
+        mkdir -p package
+        cp kasm-stress-test package/
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./package/kasm-stress-test
+        asset_name: kasm-stress-test
+        asset_content_type: application/octet-stream
