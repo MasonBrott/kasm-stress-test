@@ -57,15 +57,15 @@ Run the stress test with the following command:
 
 ```
 # Linux
-./kasm-stress-test -u username@example.com -kasm-range 1-5
+./kasm-stress-test -u username@example.com -n 5
 
 # Windows
-.\kasm-stress-test.exe -u username@example.com -kasm-range 1-5
+.\kasm-stress-test.exe -u username@example.com -n 5
 ```
 
 Command-line flags:
 - `-u`: Username to use for the test (can be specified multiple times for multiple users)
-- `-kasm-range`: Range of Kasm instances to create (e.g., 1-5 will create 5 instances)
+- `-n`: Number of Kasm instances to create
 
 ## Output
 
