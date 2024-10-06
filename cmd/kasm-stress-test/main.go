@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"kasm-stress-test/internal/config"
@@ -8,6 +9,7 @@ import (
 	"kasm-stress-test/internal/stress"
 	"kasm-stress-test/internal/utils"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -43,9 +45,11 @@ func main() {
 	utils.Info("Starting stress test for %d users", len(usernames))
 
 	var allResults []*models.StressTestResult
+	var allRunners []*stress.Runner
 
 	for _, username := range usernames {
 		runner := stress.NewRunner(cfg, username, sessionNum, command)
+		allRunners = append(allRunners, runner)
 		results := runner.Run()
 		allResults = append(allResults, results)
 	}
@@ -80,4 +84,24 @@ func main() {
 		fmt.Println(strings.Repeat("-", 30))
 	}
 	utils.Info("Stress test completed")
+
+	// Prompt user to press Enter before destroying sessions
+	fmt.Println("\nPress Enter to destroy sessions and complete the test")
+	bufio.NewReader(os.Stdin).ReadBytes('\n')
+	fmt.Println("Destroyig Sessions...")
+
+	// Destroy all Sessions
+	var destroyErrors []error
+	for _, runner := range allRunners {
+		if err := runner.DestroyAllSessions(); err != nil {
+			utils.Error("Error destroying Kasms: %v", err)
+			destroyErrors = append(destroyErrors, err)
+		}
+	}
+
+	if len(destroyErrors) == 0 {
+		fmt.Println("\nAll Kasm sessions have been successfully destroyed. Test complete.")
+	} else {
+		utils.Error("\nTest complete, but some Kasm sessions could not be destroyed.")
+	}
 }

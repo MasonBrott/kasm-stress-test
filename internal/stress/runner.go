@@ -2,6 +2,7 @@ package stress
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"kasm-stress-test/internal/api"
@@ -11,11 +12,13 @@ import (
 )
 
 type Runner struct {
-	client     *api.Client
-	config     *config.Config
-	username   string
-	sessionNum utils.IntFlag
-	command    string
+	client         *api.Client
+	config         *config.Config
+	username       string
+	sessionNum     utils.IntFlag
+	command        string
+	kasmsToDestroy []string
+	UserID         string
 }
 
 func NewRunner(cfg *config.Config, username string, sessionNum utils.IntFlag, command string) *Runner {
@@ -40,8 +43,7 @@ func (r *Runner) Run() *models.StressTestResult {
 		result.Errors = append(result.Errors, fmt.Sprintf("Failed to get user info: %v", err))
 		return result
 	}
-
-	var kasmsToDestroy []string
+	r.UserID = user.UserID
 
 	for i := 0; i < r.sessionNum.Value; i++ {
 		kasmResult := r.createAndTestKasm(i, user.UserID)
@@ -49,19 +51,12 @@ func (r *Runner) Run() *models.StressTestResult {
 
 		if kasmResult.ExecutionError == "" {
 			result.SuccessfulKasms++
-			kasmsToDestroy = append(kasmsToDestroy, kasmResult.KasmID)
+			r.kasmsToDestroy = append(r.kasmsToDestroy, kasmResult.KasmID)
 		} else {
 			result.FailedKasms++
 			result.Errors = append(result.Errors, fmt.Sprintf("Kasm %d: %s", i, kasmResult.ExecutionError))
 		}
 		result.AverageStartTime += kasmResult.StartTime
-	}
-
-	// Destroy all Kasms at the end
-	for _, kasmID := range kasmsToDestroy {
-		if err := r.client.DestroyKasm(kasmID, user.UserID); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("Failed to destroy Kasm %s: %v", kasmID, err))
-		}
 	}
 
 	result.TotalDuration = time.Since(startTime)
@@ -128,6 +123,21 @@ func (r *Runner) getCommandToExecute() string {
 	default:
 		return "echo 'Hello, Kasm!'"
 	}
+}
+
+func (r *Runner) DestroyAllSessions() error {
+	var errors []string
+	for _, kasmID := range r.kasmsToDestroy {
+		if err := r.client.DestroyKasm(kasmID, r.UserID); err != nil {
+			utils.Info("Kasm ID: %s, User ID: %v", kasmID, r.UserID)
+			utils.Error("Failed to destroy Kasm %s: %v", kasmID, err)
+			errors = append(errors, fmt.Sprintf("Failed to destroy Kasm %s: %v", kasmID, err))
+		}
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("%s", strings.Join(errors, "; "))
+	}
+	return nil
 }
 
 func (r *Runner) GetAutoscalingStatus() (*models.AutoscalingStatus, error) {
