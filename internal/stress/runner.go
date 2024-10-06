@@ -41,7 +41,7 @@ func (r *Runner) Run() *models.StressTestResult {
 
 	var kasmsToDestroy []string
 
-	for i := 0; i <= r.sessionNum.Value; i++ {
+	for i := 0; i < r.sessionNum.Value; i++ {
 		kasmResult := r.createAndTestKasm(i, user.UserID)
 		result.KasmResults = append(result.KasmResults, kasmResult)
 
