@@ -4,7 +4,7 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 
 ## Features
 
-- Create multiple Kasm instances for a specified user
+- Create multiple Kasm instances for each specified user
 - Execute commands on each Kasm instance
 - Test Kasm's autoscaling capabilities
 - Detailed logging and error reporting
@@ -29,10 +29,10 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 3. Build the project:
    ```
    # Linux
-   go build -o kasm-stress-test cmd/kasm-stress-test/main.go
+   $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o kasm-stress-test cmd/kasm-stress-test/main.go
 
    # Windows
-   go build -o kasm-stress-test.exe cmd/kasm-stress-test/main.go
+   $env:GOOS="windows"; $env:GOARCH="amd64"; go build -o kasm-stress-test.exe cmd/kasm-stress-test/main.go
    ```
 
 ## Configuration
@@ -40,7 +40,6 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 Create a `.kasm-stress-test.json` file in your home directory with the following structure:
 
 ```
-json
 {
 "api_key": "your-api-key",
 "api_secret": "your-api-secret",
@@ -57,15 +56,15 @@ Run the stress test with the following command:
 
 ```
 # Linux
-./kasm-stress-test -u username@example.com -kasm-range 1-5
+./kasm-stress-test -u username@example.com -n 5
 
 # Windows
-.\kasm-stress-test -u username@example.com -kasm-range 1-5
+.\kasm-stress-test.exe -u username@example.com -n 5
 ```
 
 Command-line flags:
 - `-u`: Username to use for the test (can be specified multiple times for multiple users)
-- `-kasm-range`: Range of Kasm instances to create (e.g., 1-5 will create 5 instances)
+- `-n`: Number of Kasm instances to create
 
 ## Output
 

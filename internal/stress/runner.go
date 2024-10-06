@@ -11,18 +11,18 @@ import (
 )
 
 type Runner struct {
-	client    *api.Client
-	config    *config.Config
-	username  string
-	kasmRange utils.IntRangeFlag
+	client     *api.Client
+	config     *config.Config
+	username   string
+	sessionNum utils.IntFlag
 }
 
-func NewRunner(cfg *config.Config, username string, kasmRange utils.IntRangeFlag) *Runner {
+func NewRunner(cfg *config.Config, username string, sessionNum utils.IntFlag) *Runner {
 	return &Runner{
-		client:    api.NewClient(cfg),
-		config:    cfg,
-		username:  username,
-		kasmRange: kasmRange,
+		client:     api.NewClient(cfg),
+		config:     cfg,
+		username:   username,
+		sessionNum: sessionNum,
 	}
 }
 
@@ -30,7 +30,7 @@ func (r *Runner) Run() *models.StressTestResult {
 	startTime := time.Now()
 	result := &models.StressTestResult{
 		Username:   r.username,
-		TotalKasms: r.kasmRange.Max - r.kasmRange.Min + 1,
+		TotalKasms: r.sessionNum.Value,
 	}
 
 	user, err := r.client.GetUserInfo(r.username)
@@ -41,8 +41,8 @@ func (r *Runner) Run() *models.StressTestResult {
 
 	var kasmsToDestroy []string
 
-	for numKasms := r.kasmRange.Min; numKasms <= r.kasmRange.Max; numKasms++ {
-		kasmResult := r.createAndTestKasm(numKasms, user.UserID)
+	for i := 0; i < r.sessionNum.Value; i++ {
+		kasmResult := r.createAndTestKasm(i, user.UserID)
 		result.KasmResults = append(result.KasmResults, kasmResult)
 
 		if kasmResult.ExecutionError == "" {
@@ -50,7 +50,7 @@ func (r *Runner) Run() *models.StressTestResult {
 			kasmsToDestroy = append(kasmsToDestroy, kasmResult.KasmID)
 		} else {
 			result.FailedKasms++
-			result.Errors = append(result.Errors, fmt.Sprintf("Kasm %d: %s", numKasms, kasmResult.ExecutionError))
+			result.Errors = append(result.Errors, fmt.Sprintf("Kasm %d: %s", i, kasmResult.ExecutionError))
 		}
 		result.AverageStartTime += kasmResult.StartTime
 	}

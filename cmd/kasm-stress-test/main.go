@@ -14,10 +14,10 @@ import (
 func main() {
 	utils.InitLoggers()
 	var usernames utils.StringSliceFlag
-	flag.Var(&usernames, "u", "Usernames to use (can be specified multiple times)")
+	flag.Var(&usernames, "u", "Username to use (can be specified multiple times)")
 
-	var kasmRange utils.IntRangeFlag
-	flag.Var(&kasmRange, "kasm-range", "Range of Kasm instances to create (e.g., 5-10)")
+	var sessionNum utils.IntFlag
+	flag.Var(&sessionNum, "n", "Number of Kasm Sessions to start for each username specified")
 
 	flag.Parse()
 
@@ -25,8 +25,8 @@ func main() {
 		log.Fatal("At least one username is required")
 	}
 
-	if kasmRange.Min == 0 || kasmRange.Max == 0 {
-		log.Fatal("Invalid Kasm range")
+	if len(sessionNum.String()) == 0 {
+		log.Fatal("Please provide the number of sessions to start")
 	}
 
 	cfg, err := config.Load()
@@ -39,7 +39,7 @@ func main() {
 	var allResults []*models.StressTestResult
 
 	for _, username := range usernames {
-		runner := stress.NewRunner(cfg, username, kasmRange)
+		runner := stress.NewRunner(cfg, username, sessionNum)
 		results := runner.Run()
 		allResults = append(allResults, results)
 	}
