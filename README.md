@@ -4,7 +4,7 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 
 ## Features
 
-- Create multiple Kasm instances for a specified user
+- Create multiple Kasm instances for each specified user
 - Execute commands on each Kasm instance
 - Test Kasm's autoscaling capabilities
 - Detailed logging and error reporting
@@ -40,7 +40,6 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 Create a `.kasm-stress-test.json` file in your home directory with the following structure:
 
 ```
-json
 {
 "api_key": "your-api-key",
 "api_secret": "your-api-secret",
