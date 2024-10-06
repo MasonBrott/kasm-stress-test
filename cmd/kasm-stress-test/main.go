@@ -15,9 +15,15 @@ func main() {
 	utils.InitLoggers()
 	var usernames utils.StringSliceFlag
 	flag.Var(&usernames, "u", "Username to use (can be specified multiple times)")
+	flag.Var(&usernames, "username", "Username to use (can be specified multiple times)")
 
 	var sessionNum utils.IntFlag
 	flag.Var(&sessionNum, "n", "Number of Kasm Sessions to start for each username specified")
+	flag.Var(&sessionNum, "number", "Number of Kasm Sessions to start for each username specified")
+
+	var command string
+	flag.StringVar(&command, "c", "all", "Command to run: 'cpu', 'network', or 'all' (default)")
+	flag.StringVar(&command, "command", "all", "Command to run: 'cpu', 'network', or 'all' (default)")
 
 	flag.Parse()
 
@@ -39,7 +45,7 @@ func main() {
 	var allResults []*models.StressTestResult
 
 	for _, username := range usernames {
-		runner := stress.NewRunner(cfg, username, sessionNum)
+		runner := stress.NewRunner(cfg, username, sessionNum, command)
 		results := runner.Run()
 		allResults = append(allResults, results)
 	}
@@ -52,6 +58,7 @@ func main() {
 		fmt.Printf("Successful Kasms: %d\n", result.SuccessfulKasms)
 		fmt.Printf("Failed Kasms: %d\n", result.FailedKasms)
 		fmt.Printf("Average start time: %.2f seconds\n", result.AverageStartTime.Seconds())
+		fmt.Printf("Total duration: %.2f seconds\n", result.TotalDuration.Seconds())
 
 		if len(result.Errors) > 0 {
 			fmt.Println("Errors encountered:")

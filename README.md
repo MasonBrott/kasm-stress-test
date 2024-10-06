@@ -15,6 +15,12 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 - Go 1.16 or higher
 - Access to a Kasm Workspaces deployment
 - API key and secret for the Kasm API
+- Your API key must be granted the following permissions in order for the tool to function:
+   - Users Auth Session
+   - User
+   - Sessions View
+   - Sessions Modify
+   - Images View
 
 ## Installation
 
@@ -56,15 +62,16 @@ Run the stress test with the following command:
 
 ```
 # Linux
-./kasm-stress-test -u username@example.com -n 5
+./kasm-stress-test -u username@example.com -n 5 -c all
 
 # Windows
-.\kasm-stress-test.exe -u username@example.com -n 5
+.\kasm-stress-test.exe -u username@example.com -n 5 -c all
 ```
 
 Command-line flags:
-- `-u`: Username to use for the test (can be specified multiple times for multiple users)
-- `-n`: Number of Kasm instances to create
+- `-u`, `--username`: Username to use for the test (can be specified multiple times for multiple users)
+- `-n`, `--number`: Number of Kasm instances to create
+- `-c`, `--command`: Command to run: 'cpu', 'network', or 'all' (default)
 
 ## Output
 
