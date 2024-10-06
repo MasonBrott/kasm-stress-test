@@ -29,10 +29,10 @@ This tool is designed to stress test Kasm Workspaces by creating multiple Kasm i
 3. Build the project:
    ```
    # Linux
-   go build -o kasm-stress-test cmd/kasm-stress-test/main.go
+   $env:GOOS="linux"; $env:GOARCH="amd64"; go build -o kasm-stress-test cmd/kasm-stress-test/main.go
 
    # Windows
-   go build -o kasm-stress-test.exe cmd/kasm-stress-test/main.go
+   $env:GOOS="windows"; $env:GOARCH="amd64"; go build -o kasm-stress-test.exe cmd/kasm-stress-test/main.go
    ```
 
 ## Configuration
@@ -60,7 +60,7 @@ Run the stress test with the following command:
 ./kasm-stress-test -u username@example.com -kasm-range 1-5
 
 # Windows
-.\kasm-stress-test -u username@example.com -kasm-range 1-5
+.\kasm-stress-test.exe -u username@example.com -kasm-range 1-5
 ```
 
 Command-line flags:
