@@ -56,7 +56,7 @@ func (c *Client) GetKasmStatus(kasmID, user_id string) (*models.KasmStatus, erro
 }
 
 // ExecCommand executes a command in a Kasm session
-func (c *Client) ExecCommand(kasmID, userID, command string) (*models.CommandResult, error) {
+func (c *Client) ExecCommand(kasmID, userID, command string) error {
 	requestBody := map[string]interface{}{
 		"kasm_id": kasmID,
 		"user_id": userID,
@@ -65,17 +65,12 @@ func (c *Client) ExecCommand(kasmID, userID, command string) (*models.CommandRes
 		},
 	}
 
-	respBody, err := c.apiRequest("exec_command_kasm", requestBody)
+	_, err := c.apiRequest("exec_command_kasm", requestBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute command: %w", err)
+		return fmt.Errorf("failed to execute command: %w", err)
 	}
 
-	var result models.CommandResult
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal command execution response: %w", err)
-	}
-
-	return &result, nil
+	return nil
 }
 
 // DestroyKasm destroys a Kasm session
@@ -130,15 +125,6 @@ func (c *Client) WaitForKasmReady(kasmID, image_id string, timeout time.Duration
 
 // GetAutoscalingStatus retrieves the current autoscaling status
 func (c *Client) GetAutoscalingStatus() (*models.AutoscalingStatus, error) {
-	respBody, err := c.apiRequest("get_autoscaling_status", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get autoscaling status: %w", err)
-	}
-
-	var result models.AutoscalingStatus
-	if err := handleAPIResponse(respBody, &result); err != nil {
-		return nil, fmt.Errorf("failed to handle autoscaling status response: %w", err)
-	}
-
-	return &result, nil
+	// Placeholder for future implementation
+	return nil, nil
 }

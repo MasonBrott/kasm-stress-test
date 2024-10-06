@@ -15,14 +15,16 @@ type Runner struct {
 	config     *config.Config
 	username   string
 	sessionNum utils.IntFlag
+	command    string
 }
 
-func NewRunner(cfg *config.Config, username string, sessionNum utils.IntFlag) *Runner {
+func NewRunner(cfg *config.Config, username string, sessionNum utils.IntFlag, command string) *Runner {
 	return &Runner{
 		client:     api.NewClient(cfg),
 		config:     cfg,
 		username:   username,
 		sessionNum: sessionNum,
+		command:    command,
 	}
 }
 
@@ -100,17 +102,32 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 
 	// Step 3: Execute command
 	utils.Info("Step 3: Executing command on Kasm %s", kasm.KasmID)
-	commandResult, err := r.client.ExecCommand(kasm.KasmID, userID, "echo 'Hello, Kasm!'")
+	command := r.getCommandToExecute()
+	err = r.client.ExecCommand(kasm.KasmID, userID, command)
 	if err != nil {
 		utils.Error("Failed to execute command on Kasm %s: %v", kasm.KasmID, err)
 		result.ExecutionError = fmt.Sprintf("Failed to execute command: %v", err)
 	} else {
-		utils.Info("Command executed on Kasm %s. Exit code: %d, Output: %s",
-			kasm.KasmID, commandResult.ExitCode, commandResult.Output)
+		utils.Info("Command executed on Kasm %s", kasm.KasmID)
 	}
 
 	utils.Info("Completed test for Kasm %d", numKasms)
 	return result
+}
+
+func (r *Runner) getCommandToExecute() string {
+	switch r.command {
+	case "cpu":
+		// 1000 MB of writes to /dev/null
+		return "dd if=/dev/zero of=/dev/null bs=1M count=1000"
+	case "network":
+		// Downloads a 10MB file 10 times without saving file
+		return "for i in {1..10}; do wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test10.zip; done"
+	case "all":
+		return "(dd if=/dev/zero of=/dev/null bs=1M count=1000 &) && (for i in {1..10}; do wget -O /dev/null http://speedtest.wdc01.softlayer.com/downloads/test10.zip; done &) && wait"
+	default:
+		return "echo 'Hello, Kasm!'"
+	}
 }
 
 func (r *Runner) GetAutoscalingStatus() (*models.AutoscalingStatus, error) {

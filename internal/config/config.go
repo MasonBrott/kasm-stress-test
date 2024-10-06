@@ -20,7 +20,6 @@ type Config struct {
 // Load reads the config file and environment variables to create a Config
 func Load() (*Config, error) {
 	config := &Config{
-		APIHost:  "https://beta.cmmc.space/api/public/",
 		LogLevel: "info",
 		Timeout:  30,
 	}

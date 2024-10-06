@@ -81,24 +81,3 @@ func (c *Client) apiRequest(endpoint string, additionalData map[string]interface
 
 	return c.post(endpoint, requestBody)
 }
-
-// handleAPIResponse is a helper function to handle common API response structure
-func handleAPIResponse(respBody []byte, result interface{}) error {
-	// Try to unmarshal into a generic structure first
-	var genericResp map[string]interface{}
-	if err := json.Unmarshal(respBody, &genericResp); err != nil {
-		return fmt.Errorf("error unmarshaling API response: %w", err)
-	}
-
-	// Check for error messages
-	if errMsg, ok := genericResp["error_message"].(string); ok && errMsg != "" {
-		return fmt.Errorf("API request failed: %s", errMsg)
-	}
-
-	// If there's no error, try to unmarshal the entire response into the result
-	if err := json.Unmarshal(respBody, result); err != nil {
-		return fmt.Errorf("error unmarshaling API result: %w", err)
-	}
-
-	return nil
-}
