@@ -14,6 +14,12 @@ import (
 )
 
 func main() {
+	err := utils.InitLoggers()
+	if err != nil {
+		log.Fatalf("Failed to initialize loggers: %v", err)
+	}
+	defer utils.CloseLogFile()
+
 	utils.InitLoggers()
 	var usernames utils.StringSliceFlag
 	flag.Var(&usernames, "u", "Username to use (can be specified multiple times)")
@@ -55,40 +61,40 @@ func main() {
 	}
 
 	// Process and print all results
-	fmt.Println("\n--- Stress Test Results ---")
+	utils.Console("\n--- Stress Test Results ---\n")
 	for _, result := range allResults {
-		fmt.Printf("\nResults for user: %s\n", result.Username)
-		fmt.Printf("Total Kasms created: %d\n", result.TotalKasms)
-		fmt.Printf("Successful Kasms: %d\n", result.SuccessfulKasms)
-		fmt.Printf("Failed Kasms: %d\n", result.FailedKasms)
-		fmt.Printf("Average start time: %.2f seconds\n", result.AverageStartTime.Seconds())
-		fmt.Printf("Total duration: %.2f seconds\n", result.TotalDuration.Seconds())
+		utils.Console("\nResults for user: %s\n", result.Username)
+		utils.Console("Total Kasms created: %d\n", result.TotalKasms)
+		utils.Console("Successful Kasms: %d\n", result.SuccessfulKasms)
+		utils.Console("Failed Kasms: %d\n", result.FailedKasms)
+		utils.Console("Average start time: %.2f seconds\n", result.AverageStartTime.Seconds())
+		utils.Console("Total duration: %.2f seconds\n", result.TotalDuration.Seconds())
 
 		if len(result.Errors) > 0 {
-			fmt.Println("Errors encountered:")
+			utils.Console("Errors encountered:\n")
 			for _, err := range result.Errors {
-				fmt.Printf("  - %s\n", err)
+				utils.Console("  - %s\n", err)
 			}
 		}
 
-		fmt.Println("\nDetailed Kasm Results:")
+		utils.Console("\nDetailed Kasm Results:\n")
 		for _, kasmResult := range result.KasmResults {
-			fmt.Printf("  Kasm #%d:\n", kasmResult.KasmNumber)
-			fmt.Printf("    Start time: %.2f seconds\n", kasmResult.StartTime.Seconds())
+			utils.Console("  Kasm #%d:\n", kasmResult.KasmNumber)
+			utils.Console("    Start time: %.2f seconds\n", kasmResult.StartTime.Seconds())
 			if kasmResult.ExecutionError != "" {
-				fmt.Printf("    Error: %s\n", kasmResult.ExecutionError)
+				utils.Console("    Error: %s\n", kasmResult.ExecutionError)
 			} else {
-				fmt.Println("    Status: Success")
+				utils.Console("    Status: Success\n")
 			}
 		}
-		fmt.Println(strings.Repeat("-", 30))
+		utils.Console("%s\n", strings.Repeat("-", 30))
 	}
 	utils.Info("Stress test completed")
 
 	// Prompt user to press Enter before destroying sessions
-	fmt.Println("\nPress Enter to destroy sessions and complete the test")
+	utils.Console("\nPress Enter to destroy sessions and complete the test\n")
 	bufio.NewReader(os.Stdin).ReadBytes('\n')
-	fmt.Println("Destroyig Sessions...")
+	utils.Console("Destroying Sessions...\n")
 
 	// Destroy all Sessions
 	var destroyErrors []error

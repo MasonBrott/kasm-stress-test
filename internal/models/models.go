@@ -36,7 +36,11 @@ type Kasm struct {
 
 // KasmStatus represents the status of a Kasm session
 type KasmStatus struct {
-	Kasm struct {
+	ErrorMessage        string `json:"error_message"`
+	OperationalMessage  string `json:"operational_message"`
+	OperationalProgress int    `json:"operational_progress"`
+	OperationalStatus   string `json:"operational_status"`
+	Kasm                struct {
 		KasmID            string `json:"kasm_id"`
 		OperationalStatus string `json:"operational_status"`
 		ContainerID       string `json:"container_id"`

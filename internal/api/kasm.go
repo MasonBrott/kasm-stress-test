@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"kasm-stress-test/internal/models"
@@ -112,26 +111,45 @@ func (c *Client) DestroyKasm(kasmID, userID string) error {
 // WaitForKasmReady waits for a Kasm session to be in the "running" state
 func (c *Client) WaitForKasmReady(kasmID, image_id string, timeout time.Duration) error {
 	start := time.Now()
+	requestedTime := time.Time{}
+	maxRequestedTime := 3 * time.Minute // Maximum time to wait in "requested" state
+	lastNotificationTime := time.Time{}
+	notificationInterval := 30 * time.Second
+
 	for time.Since(start) < timeout {
 		status, err := c.GetKasmStatus(kasmID, image_id)
 		if err != nil {
-			if strings.Contains(err.Error(), "This session is currently requested") {
-				utils.Info("Kasm %s is still in requested state. Waiting...", kasmID)
-				time.Sleep(10 * time.Second)
-				continue
-			}
+			utils.Error("Failed to get Kasm status: %v", err)
+			time.Sleep(15 * time.Second)
+			continue
 		}
 
 		if status.Kasm.OperationalStatus == "running" {
 			return nil
 		}
 
-		if time.Since(start) > timeout {
-			return fmt.Errorf("timeout waiting for Kasm to be ready")
+		if status.ErrorMessage == "This session is currently requested." {
+			if requestedTime.IsZero() {
+				requestedTime = time.Now()
+				utils.Console("Kasm %s is in requested state\n", kasmID)
+			} else if time.Since(requestedTime) > maxRequestedTime {
+				return fmt.Errorf("Kasm %s stuck in 'requested' state for too long", kasmID)
+			}
+		} else {
+			requestedTime = time.Time{} // Reset if not in "requested" state
 		}
 
-		utils.Info("Kasm %s status: %s. Waiting... (%s)", kasmID, status.Kasm.OperationalStatus, time.Since(start))
-		time.Sleep(10 * time.Second)
+		if time.Since(lastNotificationTime) >= notificationInterval {
+			utils.Console("Waiting for Kasm %s - Status: Requested, Progress: %d%%, Time elapsed: %s\n",
+				kasmID, status.OperationalProgress, time.Since(start).Round(time.Second))
+			lastNotificationTime = time.Now()
+		}
+
+		utils.Info("Kasm %s status: Requested. Message: %s. Progress: %d%%. Waiting... (%s)",
+			kasmID, status.OperationalMessage,
+			status.OperationalProgress, time.Since(start))
+
+		time.Sleep(30 * time.Second)
 	}
 	return fmt.Errorf("timeout waiting for Kasm %s to be ready", kasmID)
 }
