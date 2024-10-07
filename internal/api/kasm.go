@@ -75,52 +75,83 @@ func (c *Client) ExecCommand(kasmID, userID, command string) error {
 
 // DestroyKasm destroys a Kasm session
 func (c *Client) DestroyKasm(kasmID, userID string) error {
-	respBody, err := c.apiRequest("destroy_kasm", map[string]interface{}{
-		"kasm_id": kasmID,
-		"user_id": userID,
-	})
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		respBody, err := c.apiRequest("destroy_kasm", map[string]interface{}{
+			"kasm_id": kasmID,
+			"user_id": userID,
+		})
 
-	if err != nil {
-		return fmt.Errorf("failed to destroy Kasm: %w", err)
+		if err == nil {
+			// If the response is empty, it means the Kasm was destroyed successfully
+			if len(respBody) == 0 || string(respBody) == "{}" {
+				return nil
+			}
+
+			var result map[string]interface{}
+			if err := json.Unmarshal(respBody, &result); err != nil {
+				return fmt.Errorf("failed to parse destroy Kasm response: %w", err)
+			}
+
+			if errMsg, ok := result["error_message"].(string); ok && errMsg != "" {
+				return fmt.Errorf("failed to destroy Kasm: %s", errMsg)
+			}
+
+			// If we get here, there was a non-empty response without an error message
+			return fmt.Errorf("unexpected response when destroying Kasm: %s", string(respBody))
+		}
+
+		utils.Error("Attempt %d to destroy Kasm %s failed: %v. Retrying...", i+1, kasmID, err)
+		time.Sleep(time.Second * time.Duration(i+1))
 	}
 
-	// If the response is empty, it means the Kasm was destroyed successfully
-	if len(respBody) == 0 || string(respBody) == "{}" {
-		return nil
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return fmt.Errorf("failed to parse destroy Kasm response: %w", err)
-	}
-
-	if errMsg, ok := result["error_message"].(string); ok && errMsg != "" {
-		return fmt.Errorf("failed to destroy Kasm: %s", errMsg)
-	}
-
-	// If we get here, there was a non-empty response without an error message
-	return fmt.Errorf("unexpected response when destroying Kasm: %s", string(respBody))
+	return fmt.Errorf("failed to destroy Kasm after %d attempts", maxRetries)
 }
 
 // WaitForKasmReady waits for a Kasm session to be in the "running" state
 func (c *Client) WaitForKasmReady(kasmID, image_id string, timeout time.Duration) error {
 	start := time.Now()
-	for {
+	requestedTime := time.Time{}
+	maxRequestedTime := 3 * time.Minute // Maximum time to wait in "requested" state
+	lastNotificationTime := time.Time{}
+	notificationInterval := 30 * time.Second
+
+	for time.Since(start) < timeout {
 		status, err := c.GetKasmStatus(kasmID, image_id)
 		if err != nil {
-			return fmt.Errorf("failed to get Kasm status: %w", err)
+			utils.Error("Failed to get Kasm status: %v", err)
+			time.Sleep(15 * time.Second)
+			continue
 		}
 
 		if status.Kasm.OperationalStatus == "running" {
 			return nil
 		}
 
-		if time.Since(start) > timeout {
-			return fmt.Errorf("timeout waiting for Kasm to be ready")
+		if status.ErrorMessage == "This session is currently requested." {
+			if requestedTime.IsZero() {
+				requestedTime = time.Now()
+				utils.Console("Kasm %s is in requested state\n", kasmID)
+			} else if time.Since(requestedTime) > maxRequestedTime {
+				return fmt.Errorf("Kasm %s stuck in 'requested' state for too long", kasmID)
+			}
+		} else {
+			requestedTime = time.Time{} // Reset if not in "requested" state
 		}
 
-		time.Sleep(5 * time.Second)
+		if time.Since(lastNotificationTime) >= notificationInterval {
+			utils.Console("Waiting for Kasm %s - Status: Requested, Progress: %d%%, Time elapsed: %s\n",
+				kasmID, status.OperationalProgress, time.Since(start).Round(time.Second))
+			lastNotificationTime = time.Now()
+		}
+
+		utils.Info("Kasm %s status: Requested. Message: %s. Progress: %d%%. Waiting... (%s)",
+			kasmID, status.OperationalMessage,
+			status.OperationalProgress, time.Since(start))
+
+		time.Sleep(30 * time.Second)
 	}
+	return fmt.Errorf("timeout waiting for Kasm %s to be ready", kasmID)
 }
 
 // GetAutoscalingStatus retrieves the current autoscaling status
