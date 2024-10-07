@@ -96,7 +96,7 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 
 	// Step 2: Wait for Kasm to be ready
 	utils.Info("Step 2: Waiting for Kasm %s to be ready", kasm.KasmID)
-	err = r.client.WaitForKasmReady(kasm.KasmID, userID, 5*time.Minute)
+	err = r.client.WaitForKasmReady(kasm.KasmID, userID, 10*time.Minute)
 	if err != nil {
 		if strings.Contains(err.Error(), "stuck in 'requested' state for too long") {
 			utils.Error("Kasm %s stuck in 'requested' state. Attempting to destroy and recreate.", kasm.KasmID)

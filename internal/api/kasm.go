@@ -112,7 +112,7 @@ func (c *Client) DestroyKasm(kasmID, userID string) error {
 func (c *Client) WaitForKasmReady(kasmID, image_id string, timeout time.Duration) error {
 	start := time.Now()
 	requestedTime := time.Time{}
-	maxRequestedTime := 3 * time.Minute // Maximum time to wait in "requested" state
+	maxRequestedTime := 5 * time.Minute // Maximum time to wait in "requested" state
 	lastNotificationTime := time.Time{}
 	notificationInterval := 30 * time.Second
 
