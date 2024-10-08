@@ -11,7 +11,126 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
+
+type SessionStatus struct {
+	Status   string
+	Duration time.Duration
+}
+
+var (
+	sessionStatuses map[string][]SessionStatus
+	statusMutex     sync.Mutex
+	allRunners      []*stress.Runner
+	allResults      []*models.StressTestResult
+	resultsMutex    sync.Mutex
+	startTime       time.Time
+	lastOutput      []string
+)
+
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	} else if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
+}
+
+func updateSessionStatus(username string, sessionNumber int, status string, duration time.Duration) {
+	statusMutex.Lock()
+	defer statusMutex.Unlock()
+	if sessionStatuses[username] == nil {
+		sessionStatuses[username] = make([]SessionStatus, 0)
+	}
+	for len(sessionStatuses[username]) <= sessionNumber {
+		sessionStatuses[username] = append(sessionStatuses[username], SessionStatus{})
+	}
+	sessionStatuses[username][sessionNumber] = SessionStatus{Status: status, Duration: duration}
+}
+
+// func getStatusString() string {
+// 	statusMutex.Lock()
+// 	defer statusMutex.Unlock()
+
+// 	elapsedTime := time.Since(startTime)
+// 	return fmt.Sprintf("Kasm Stress Test Status - Elapsed Time: %s", formatDuration(elapsedTime))
+// }
+
+// func getDetailedStatus() string {
+// 	statusMutex.Lock()
+// 	defer statusMutex.Unlock()
+
+// 	var output strings.Builder
+// 	for username, sessions := range sessionStatuses {
+// 		output.WriteString(fmt.Sprintf("\nStarting %d sessions for user %s\n", len(sessions), username))
+// 		for i, session := range sessions {
+// 			output.WriteString(fmt.Sprintf("Session %d:\n", i+1))
+// 			output.WriteString(fmt.Sprintf("    Status - %s\n", session.Status))
+// 			output.WriteString(fmt.Sprintf("    Duration - %s\n", formatDuration(session.Duration)))
+// 		}
+// 		output.WriteString("\n")
+// 	}
+// 	return output.String()
+// }
+
+func clearScreen() {
+	fmt.Print("\033[2J")
+	moveCursorToTop()
+}
+
+func moveCursorToTop() {
+	fmt.Print("\033[H")
+}
+
+func updateLine(content string) {
+	fmt.Printf("\033[K%s", content) // Clear line and print new content
+}
+
+func updateDisplay() {
+	statusMutex.Lock()
+	defer statusMutex.Unlock()
+
+	var newOutput []string
+
+	elapsedTime := time.Since(startTime)
+	newOutput = append(newOutput, fmt.Sprintf("Kasm Stress Test Status - Elapsed Time: %s", formatDuration(elapsedTime)))
+	newOutput = append(newOutput, "")
+
+	for username, sessions := range sessionStatuses {
+		newOutput = append(newOutput, fmt.Sprintf("Starting %d sessions for user %s", len(sessions), username))
+		for i, session := range sessions {
+			newOutput = append(newOutput, fmt.Sprintf("Session %d:", i+1))
+			newOutput = append(newOutput, fmt.Sprintf("    Status - %s", session.Status))
+			newOutput = append(newOutput, fmt.Sprintf("    Duration - %s", formatDuration(session.Duration)))
+		}
+		newOutput = append(newOutput, "")
+	}
+
+	moveCursorToTop()
+	for i, line := range newOutput {
+		if i >= len(lastOutput) || line != lastOutput[i] {
+			updateLine(line)
+		}
+		fmt.Print("\n")
+	}
+
+	// Clear any remaining lines from the previous output
+	for i := len(newOutput); i < len(lastOutput); i++ {
+		updateLine("")
+		fmt.Print("\n")
+	}
+
+	lastOutput = newOutput
+}
 
 func main() {
 	err := utils.InitLoggers()
@@ -20,7 +139,6 @@ func main() {
 	}
 	defer utils.CloseLogFile()
 
-	utils.InitLoggers()
 	var usernames utils.StringSliceFlag
 	flag.Var(&usernames, "u", "Username to use (can be specified multiple times)")
 	flag.Var(&usernames, "username", "Username to use (can be specified multiple times)")
@@ -48,17 +166,54 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	utils.Info("Starting stress test for %d users", len(usernames))
+	sessionStatuses = make(map[string][]SessionStatus)
 
-	var allResults []*models.StressTestResult
-	var allRunners []*stress.Runner
+	startTime = time.Now()
 
+	// Clear the screen and hide the cursor
+	fmt.Print("\033[2J\033[?25l")
+	defer fmt.Print("\033[?25h") // Show the cursor when done
+
+	// Start a goroutine to update the display
+	stopChan := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				updateDisplay()
+			case <-stopChan:
+				return
+			}
+		}
+	}()
+
+	var wg sync.WaitGroup
 	for _, username := range usernames {
-		runner := stress.NewRunner(cfg, username, sessionNum, command)
-		allRunners = append(allRunners, runner)
-		results := runner.Run()
-		allResults = append(allResults, results)
+		wg.Add(1)
+		go func(username string) {
+			defer wg.Done()
+			runner := stress.NewRunner(cfg, username, sessionNum, command)
+			allRunners = append(allRunners, runner)
+			for i := 0; i < sessionNum.Value; i++ {
+				updateSessionStatus(username, i, "Starting", 0)
+			}
+			results := runner.Run(func(sessionNumber int, status string, duration time.Duration) {
+				updateSessionStatus(username, sessionNumber, status, duration)
+				time.Sleep(100 * time.Millisecond)
+			})
+			resultsMutex.Lock()
+			allResults = append(allResults, results)
+			resultsMutex.Unlock()
+		}(username)
 	}
+
+	wg.Wait()
+	close(stopChan)
+
+	// Clear the screen one last time before showing results
+	clearScreen()
 
 	// Process and print all results
 	utils.Console("\n--- Stress Test Results ---\n")
