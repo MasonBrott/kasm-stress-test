@@ -10,6 +10,7 @@ import (
 	"kasm-stress-test/internal/utils"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +29,7 @@ var (
 	resultsMutex    sync.Mutex
 	startTime       time.Time
 	lastOutput      []string
+	updateChan      chan struct{}
 )
 
 func formatDuration(d time.Duration) string {
@@ -57,31 +59,6 @@ func updateSessionStatus(username string, sessionNumber int, status string, dura
 	sessionStatuses[username][sessionNumber] = SessionStatus{Status: status, Duration: duration}
 }
 
-// func getStatusString() string {
-// 	statusMutex.Lock()
-// 	defer statusMutex.Unlock()
-
-// 	elapsedTime := time.Since(startTime)
-// 	return fmt.Sprintf("Kasm Stress Test Status - Elapsed Time: %s", formatDuration(elapsedTime))
-// }
-
-// func getDetailedStatus() string {
-// 	statusMutex.Lock()
-// 	defer statusMutex.Unlock()
-
-// 	var output strings.Builder
-// 	for username, sessions := range sessionStatuses {
-// 		output.WriteString(fmt.Sprintf("\nStarting %d sessions for user %s\n", len(sessions), username))
-// 		for i, session := range sessions {
-// 			output.WriteString(fmt.Sprintf("Session %d:\n", i+1))
-// 			output.WriteString(fmt.Sprintf("    Status - %s\n", session.Status))
-// 			output.WriteString(fmt.Sprintf("    Duration - %s\n", formatDuration(session.Duration)))
-// 		}
-// 		output.WriteString("\n")
-// 	}
-// 	return output.String()
-// }
-
 func clearScreen() {
 	fmt.Print("\033[2J")
 	moveCursorToTop()
@@ -105,7 +82,16 @@ func updateDisplay() {
 	newOutput = append(newOutput, fmt.Sprintf("Kasm Stress Test Status - Elapsed Time: %s", formatDuration(elapsedTime)))
 	newOutput = append(newOutput, "")
 
-	for username, sessions := range sessionStatuses {
+	// Create a sorted list of usernames
+	var usernames []string
+	for username := range sessionStatuses {
+		usernames = append(usernames, username)
+	}
+	sort.Strings(usernames)
+
+	// Iterate through sorted usernames
+	for _, username := range usernames {
+		sessions := sessionStatuses[username]
 		newOutput = append(newOutput, fmt.Sprintf("Starting %d sessions for user %s", len(sessions), username))
 		for i, session := range sessions {
 			newOutput = append(newOutput, fmt.Sprintf("Session %d:", i+1))
@@ -167,6 +153,7 @@ func main() {
 	}
 
 	sessionStatuses = make(map[string][]SessionStatus)
+	updateChan = make(chan struct{}, 100)
 
 	startTime = time.Now()
 
@@ -177,11 +164,16 @@ func main() {
 	// Start a goroutine to update the display
 	stopChan := make(chan struct{})
 	go func() {
-		ticker := time.NewTicker(250 * time.Millisecond)
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ticker.C:
+				// Update elapsed time
+				updateDisplay()
+			case <-updateChan:
+				// Update session statuses
 				updateDisplay()
 			case <-stopChan:
 				return
@@ -198,10 +190,12 @@ func main() {
 			allRunners = append(allRunners, runner)
 			for i := 0; i < sessionNum.Value; i++ {
 				updateSessionStatus(username, i, "Starting", 0)
+				updateChan <- struct{}{}
 			}
 			results := runner.Run(func(sessionNumber int, status string, duration time.Duration) {
 				updateSessionStatus(username, sessionNumber, status, duration)
-				time.Sleep(100 * time.Millisecond)
+				updateChan <- struct{}{}
+				time.Sleep(100 * time.Millisecond) // Short delay after each status update
 			})
 			resultsMutex.Lock()
 			allResults = append(allResults, results)
