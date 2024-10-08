@@ -3,6 +3,7 @@ package stress
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"kasm-stress-test/internal/api"
@@ -19,19 +20,25 @@ type Runner struct {
 	command        string
 	kasmsToDestroy []string
 	UserID         string
+	wg             sync.WaitGroup
+	statusCallback func(sessionNumber int, status string, duration time.Duration)
 }
 
 func NewRunner(cfg *config.Config, username string, sessionNum utils.IntFlag, command string) *Runner {
 	return &Runner{
-		client:     api.NewClient(cfg),
-		config:     cfg,
-		username:   username,
-		sessionNum: sessionNum,
-		command:    command,
+		client:         api.NewClient(cfg),
+		config:         cfg,
+		username:       username,
+		sessionNum:     sessionNum,
+		command:        command,
+		statusCallback: func(sessionNumber int, status string, duration time.Duration) {},
 	}
 }
 
-func (r *Runner) Run() *models.StressTestResult {
+func (r *Runner) Run(callback func(sessionNumber int, status string, duration time.Duration)) *models.StressTestResult {
+	r.statusCallback = callback
+	r.wg.Add(1)
+	defer r.wg.Done()
 	startTime := time.Now()
 	result := &models.StressTestResult{
 		Username:   r.username,
@@ -74,13 +81,14 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 		KasmNumber: numKasms + 1,
 	}
 
-	utils.Console("Starting session %d for user %s\n", numKasms+1, r.username)
+	// utils.Console("Starting session %d for user %s\n", numKasms+1, r.username)
 	utils.Info("Starting test for Kasm %d", numKasms+1)
 	startTime := time.Now()
 
 	// Step 1: Request Kasm
 	utils.Info("Step 1: Requesting Kasm for user %s", r.username)
 	kasm, err := r.client.RequestKasm(userID, r.config.DefaultImageID)
+	r.statusCallback(numKasms, "Requesting Kasm", time.Since(startTime))
 	if err != nil {
 		utils.Error("Failed to request Kasm for user %s: %v", r.username, err)
 		result.ExecutionError = fmt.Sprintf("Failed to request Kasm: %v", err)
@@ -97,6 +105,7 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 	// Step 2: Wait for Kasm to be ready
 	utils.Info("Step 2: Waiting for Kasm %s to be ready", kasm.KasmID)
 	err = r.client.WaitForKasmReady(kasm.KasmID, userID, 10*time.Minute)
+	r.statusCallback(numKasms, "Waiting for Kasm", time.Since(startTime))
 	if err != nil {
 		if strings.Contains(err.Error(), "stuck in 'requested' state for too long") {
 			utils.Error("Kasm %s stuck in 'requested' state. Attempting to destroy and recreate.", kasm.KasmID)
@@ -118,6 +127,7 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 	if r.command == "all" {
 		// Execute CPU test
 		err = r.client.ExecCommand(kasm.KasmID, userID, r.getCPUCommand())
+		r.statusCallback(numKasms, "Executing command", time.Since(startTime))
 		if err != nil {
 			utils.Error("Failed to execute CPU command on Kasm %s: %v", kasm.KasmID, err)
 			result.ExecutionError = fmt.Sprintf("Failed to execute CPU command: %v", err)
@@ -127,6 +137,7 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 
 		// Execute Network test
 		err = r.client.ExecCommand(kasm.KasmID, userID, r.getNetworkCommand())
+		r.statusCallback(numKasms, "Executing command", time.Since(startTime))
 		if err != nil {
 			utils.Error("Failed to execute Network command on Kasm %s: %v", kasm.KasmID, err)
 			result.ExecutionError += fmt.Sprintf(" Failed to execute Network command: %v", err)
@@ -137,6 +148,7 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 		// Execute single command for other cases
 		command := r.getCommandToExecute()
 		err = r.client.ExecCommand(kasm.KasmID, userID, command)
+		r.statusCallback(numKasms, "Executing command", time.Since(startTime))
 		if err != nil {
 			utils.Error("Failed to execute command on Kasm %s: %v", kasm.KasmID, err)
 			result.ExecutionError = fmt.Sprintf("Failed to execute command: %v", err)
@@ -146,6 +158,7 @@ func (r *Runner) createAndTestKasm(numKasms int, userID string) models.KasmResul
 	}
 
 	utils.Info("Completed test for Kasm %d", numKasms+1)
+	r.statusCallback(numKasms, "Completed", time.Since(startTime))
 	return result
 }
 
@@ -193,4 +206,8 @@ func (r *Runner) GetAutoscalingStatus() (*models.AutoscalingStatus, error) {
 		MaxNodes:     10,
 		CurrentLoad:  0.5,
 	}, nil
+}
+
+func (r *Runner) Wait() {
+	r.wg.Wait()
 }
