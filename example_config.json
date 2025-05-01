@@ -1,0 +1,8 @@
+{
+    "api_key": "YOUR_KEY_HERE",
+    "api_secret": "YOUR_SECRET_HERE",
+    "api_host": "https://YOUR_API_HOST/api/public",
+    "default_image_id": "YOUR_DEFAULT_IMAGE_ID",
+    "log_level": "info",
+    "timeout_seconds": 300
+}
